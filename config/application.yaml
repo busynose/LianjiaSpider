@@ -1,6 +1,6 @@
 server:
   port: 3306
-datasource:
+mysql:
   driverName: mysql
   host: 127.0.0.1
   port: 3306
@@ -8,11 +8,13 @@ datasource:
   username: root
   password: 123
   charset: utf8mb4
+elastic:
+  selling: lianjia_selling
+  sold: lianjia_sold
 source:
   # 区域
   district:
     - nanhai
-    - shunde
   # 二手房地址
   ershoufang: https://fs.lianjia.com/ershoufang/
   # 成交地址

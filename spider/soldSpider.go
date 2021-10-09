@@ -1,6 +1,8 @@
 package spider
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
@@ -8,20 +10,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/esapi"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gocolly/colly"
-	"github.com/jinzhu/gorm"
 	"xietong.me/LianjiaSpider/common"
 	"xietong.me/LianjiaSpider/model"
 )
 
-func GetSoldInfoSpider(db *gorm.DB, districtName string, page int) {
+func GetSoldInfoSpider(esClient *elasticsearch.Client, districtName string, page int) {
 	c := colly.NewCollector(
 		//colly.Async(true),并发
 		colly.AllowURLRevisit(),
 		colly.UserAgent("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"),
 	)
 	c.SetRequestTimeout(time.Duration(120) * time.Second)
-	c.Limit(&colly.LimitRule{DomainGlob: "https://sz.lianjia.com/chengjiao", Parallelism: 1}) //Parallelism代表最大并发数
+	c.Limit(&colly.LimitRule{DomainGlob: common.ChengjiaoUrl, Parallelism: 1}) //Parallelism代表最大并发数
 	c.OnRequest(func(r *colly.Request) {
 		log.Println("Visiting", r.URL)
 	})
@@ -43,12 +46,27 @@ func GetSoldInfoSpider(db *gorm.DB, districtName string, page int) {
 		soldYear := strings.Split(dealDate, ".")[0]                                                                    //分离出成交年份
 		soldMonth := strings.Split(dealDate, ".")[1]                                                                   //分离出成交月
 		if houseId != "" {
-			fmt.Println("start save", houseId, page)
+			// fmt.Println("start save", houseId, page)
 			soldInfo := model.Sold{Id: houseId, Name: name, TotalPrice: totalPrice, UnitPrice: unitPrice, District: districtName, SoldYear: soldYear, SoldMonth: soldMonth, Area: area}
-			err := db.Save(&soldInfo).Error
-			for err != nil {
-				soldInfo := model.Sold{Id: houseId, Name: name, TotalPrice: totalPrice, UnitPrice: unitPrice, District: districtName, SoldYear: soldYear, SoldMonth: soldMonth, Area: area}
-				err = db.Save(&soldInfo).Error
+			body, err := json.Marshal(soldInfo)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			req := esapi.IndexRequest{
+				Index:        common.SoldIndex,
+				DocumentType: "sold",
+				DocumentID:   houseId,
+				Body:         strings.NewReader(string(body)),
+				Refresh:      "true",
+				Timeout:      time.Second * 60,
+			}
+
+			res, err := req.Do(context.Background(), esClient)
+			fmt.Println(res, err)
+			if err != nil {
+				fmt.Println(err)
 			}
 		}
 	})
@@ -58,5 +76,4 @@ func GetSoldInfoSpider(db *gorm.DB, districtName string, page int) {
 	})
 	c.Visit(common.ChengjiaoUrl + districtName + "/pg" + strconv.Itoa(page))
 	c.Wait()
-
 }

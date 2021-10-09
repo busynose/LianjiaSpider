@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gocolly/colly"
-	"github.com/jinzhu/gorm"
 	"xietong.me/LianjiaSpider/common"
 )
 
@@ -17,7 +17,7 @@ type Page struct {
 	CurPage   int `json:"curPage"`
 }
 
-func GetSellingPageSpider(db *gorm.DB, districtName string) int {
+func GetSellingPageSpider(districtName string) int {
 	var totalPage int
 	c := colly.NewCollector(
 		//colly.Async(true),并发
@@ -49,7 +49,7 @@ func GetSellingPageSpider(db *gorm.DB, districtName string) int {
 	c.Wait()
 	return totalPage
 }
-func GetSoldPageSpider(db *gorm.DB, districtName string) int {
+func GetSoldPageSpider(db *elasticsearch.Client, districtName string) int {
 	var totalPage int
 	c := colly.NewCollector(
 		//colly.Async(true),并发
@@ -57,7 +57,7 @@ func GetSoldPageSpider(db *gorm.DB, districtName string) int {
 		colly.UserAgent("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"),
 	)
 	c.SetRequestTimeout(time.Duration(90) * time.Second)
-	c.Limit(&colly.LimitRule{DomainGlob: "https://sz.lianjia.com/chengjiao", Parallelism: 1}) //Parallelism代表最大并发数
+	c.Limit(&colly.LimitRule{DomainGlob: common.ChengjiaoUrl, Parallelism: 1}) //Parallelism代表最大并发数
 	c.OnRequest(func(r *colly.Request) {
 		log.Println("Visiting", r.URL)
 	})

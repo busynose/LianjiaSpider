@@ -1,6 +1,8 @@
 package spider
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
@@ -8,19 +10,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/esapi"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gocolly/colly"
-	"github.com/jinzhu/gorm"
 	"xietong.me/LianjiaSpider/common"
 	"xietong.me/LianjiaSpider/model"
 )
 
-func GetSellingInfoSpider(db *gorm.DB, districtName string, page int) {
+func GetSellingInfoSpider(esClient *elasticsearch.Client, districtName string, page int) {
 	c := colly.NewCollector(
 		colly.AllowURLRevisit(),
 		colly.UserAgent("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"),
 	)
 	c.SetRequestTimeout(time.Duration(120) * time.Second)
-	c.Limit(&colly.LimitRule{DomainGlob: "https://sz.lianjia.com/ershoufang", Parallelism: 1}) //Parallelism代表最大并发数
+	c.Limit(&colly.LimitRule{DomainGlob: common.ErshoufangUrl, Parallelism: 1}) //Parallelism代表最大并发数
 	c.OnRequest(func(r *colly.Request) {
 		log.Println("Visiting", r.URL)
 	})
@@ -39,12 +42,27 @@ func GetSellingInfoSpider(db *gorm.DB, districtName string, page int) {
 		area, _ := strconv.Atoi(string(re.Find([]byte(strings.Split(e.ChildText("div.info > div.address > div.houseInfo "), " | ")[1])))) // //读取页面元素获取面积,正则匹配单价的数字，转换成int类型
 		info := string([]byte(e.ChildText("div.info > div.address > div.houseInfo ")))
 		if houseId != "" {
-			fmt.Println("start save", houseId, page)
+			// fmt.Println("start save", houseId, page)
 			sellingInfo := model.Selling{Id: houseId, Name: name, TotalPrice: totalPrice, UnitPrice: unitPrice, District: districtName, Region: region, Area: area, Info: info}
-			err := db.Save(&sellingInfo).Error
-			for err != nil {
-				sellingInfo := model.Selling{Id: houseId, Name: name, TotalPrice: totalPrice, UnitPrice: unitPrice, District: districtName, Region: region, Area: area, Info: info}
-				err = db.Save(&sellingInfo).Error
+
+			body, err := json.Marshal(sellingInfo)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			req := esapi.IndexRequest{
+				Index:        common.SellingIndex,
+				DocumentType: "selling",
+				DocumentID:   houseId,
+				Body:         strings.NewReader(string(body)),
+				Refresh:      "true",
+				Timeout:      time.Second * 60,
+			}
+
+			_, err = req.Do(context.Background(), esClient)
+			if err != nil {
+				fmt.Println(err)
 			}
 		}
 	})
