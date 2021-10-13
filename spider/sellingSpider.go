@@ -15,14 +15,15 @@ import (
 	"github.com/gocolly/colly"
 	"xietong.me/LianjiaSpider/common"
 	"xietong.me/LianjiaSpider/model"
+	"xietong.me/LianjiaSpider/pkg"
 )
 
-func GetSellingInfoSpider(esClient *elasticsearch.Client, districtName string, page int) {
+func GetSellingInfoSpider(esClient *elasticsearch.Client, districtName string, page int, filter string) {
 	c := colly.NewCollector(
 		colly.AllowURLRevisit(),
 		colly.UserAgent("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"),
 	)
-	c.SetRequestTimeout(time.Duration(120) * time.Second)
+	c.SetRequestTimeout(time.Duration(300) * time.Second)
 	c.Limit(&colly.LimitRule{DomainGlob: common.ErshoufangUrl, Parallelism: 1}) //Parallelism代表最大并发数
 	c.OnRequest(func(r *colly.Request) {
 		log.Println("Visiting", r.URL)
@@ -41,9 +42,12 @@ func GetSellingInfoSpider(esClient *elasticsearch.Client, districtName string, p
 		unitPrice, _ := strconv.Atoi(string(re.Find([]byte(e.DOM.Find(".info .priceInfo .unitPrice span").Eq(0).Text()))))                //读取页面元素获取单价,正则匹配单价的数字，转换成int类型
 		area, _ := strconv.Atoi(string(re.Find([]byte(strings.Split(e.ChildText("div.info > div.address > div.houseInfo "), " | ")[1])))) // //读取页面元素获取面积,正则匹配单价的数字，转换成int类型
 		info := string([]byte(e.ChildText("div.info > div.address > div.houseInfo ")))
+		follow := e.ChildText("div.info > div.followInfo ")
+		fav, day := pkg.ParseFavAndDay(follow)
+		t := time.Now().AddDate(0, 0, -1*day)
 		if houseId != "" {
 			// fmt.Println("start save", houseId, page)
-			sellingInfo := model.Selling{Id: houseId, Name: name, TotalPrice: totalPrice, UnitPrice: unitPrice, District: districtName, Region: region, Area: area, Info: info}
+			sellingInfo := model.Selling{Id: houseId, Name: name, TotalPrice: totalPrice, UnitPrice: unitPrice, District: districtName, Region: region, Area: area, Info: info, Fav: fav, TimeStamp: t}
 
 			body, err := json.Marshal(sellingInfo)
 			if err != nil {
@@ -52,25 +56,24 @@ func GetSellingInfoSpider(esClient *elasticsearch.Client, districtName string, p
 			}
 
 			req := esapi.IndexRequest{
-				Index:        common.SellingIndex,
-				DocumentType: "selling",
-				DocumentID:   houseId,
-				Body:         strings.NewReader(string(body)),
-				Refresh:      "true",
-				Timeout:      time.Second * 60,
+				Index:      common.SellingIndex,
+				DocumentID: houseId,
+				Body:       strings.NewReader(string(body)),
 			}
 
-			_, err = req.Do(context.Background(), esClient)
+			rsp, err := req.Do(context.Background(), esClient)
 			if err != nil {
 				fmt.Println(err)
 			}
+			_ = rsp.Body.Close()
 		}
 	})
 	c.OnError(func(_ *colly.Response, err error) {
 		fmt.Println("Something went wrong:", err)
-		c.Visit(common.ErshoufangUrl + districtName + "/pg" + strconv.Itoa(page))
+		time.Sleep(time.Second * 10)
+		c.Visit(common.ErshoufangUrl + districtName + "/pg" + strconv.Itoa(page) + filter + "/")
 	})
-	c.Visit(common.ErshoufangUrl + districtName + "/pg" + strconv.Itoa(page))
+	c.Visit(common.ErshoufangUrl + districtName + "/pg" + strconv.Itoa(page) + filter + "/")
 	c.Wait()
 
 }

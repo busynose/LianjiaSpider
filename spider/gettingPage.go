@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gocolly/colly"
 	"xietong.me/LianjiaSpider/common"
 )
@@ -17,14 +16,14 @@ type Page struct {
 	CurPage   int `json:"curPage"`
 }
 
-func GetSellingPageSpider(districtName string) int {
+func GetSellingPageSpider(districtName string, area string) int {
 	var totalPage int
 	c := colly.NewCollector(
 		//colly.Async(true),并发
 		colly.AllowURLRevisit(),
 		colly.UserAgent("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"),
 	)
-	c.SetRequestTimeout(time.Duration(35) * time.Second)
+	c.SetRequestTimeout(time.Duration(300) * time.Second)
 	c.Limit(&colly.LimitRule{DomainGlob: common.ErshoufangUrl, Parallelism: 1}) //Parallelism代表最大并发数
 	c.OnRequest(func(r *colly.Request) {
 		log.Println("Visiting", r.URL)
@@ -43,20 +42,21 @@ func GetSellingPageSpider(districtName string) int {
 	})
 	c.OnError(func(_ *colly.Response, err error) {
 		fmt.Println("Something went wrong:", err)
-		c.Visit(common.ErshoufangUrl + districtName)
+		c.Visit(common.ErshoufangUrl + districtName + "/" + area)
 	})
-	c.Visit(common.ErshoufangUrl + districtName)
+	c.Visit(common.ErshoufangUrl + districtName + "/" + area)
 	c.Wait()
 	return totalPage
 }
-func GetSoldPageSpider(db *elasticsearch.Client, districtName string) int {
+
+func GetSoldPageSpider(districtName string, area string) int {
 	var totalPage int
 	c := colly.NewCollector(
 		//colly.Async(true),并发
 		colly.AllowURLRevisit(),
 		colly.UserAgent("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"),
 	)
-	c.SetRequestTimeout(time.Duration(90) * time.Second)
+	c.SetRequestTimeout(time.Duration(300) * time.Second)
 	c.Limit(&colly.LimitRule{DomainGlob: common.ChengjiaoUrl, Parallelism: 1}) //Parallelism代表最大并发数
 	c.OnRequest(func(r *colly.Request) {
 		log.Println("Visiting", r.URL)
@@ -75,9 +75,9 @@ func GetSoldPageSpider(db *elasticsearch.Client, districtName string) int {
 	})
 	c.OnError(func(_ *colly.Response, err error) {
 		fmt.Println("Something went wrong:", err)
-		c.Visit(common.ChengjiaoUrl + districtName)
+		c.Visit(common.ChengjiaoUrl + districtName + "/" + area)
 	})
-	c.Visit(common.ChengjiaoUrl + districtName)
+	c.Visit(common.ChengjiaoUrl + districtName + "/" + area)
 	c.Wait()
 	return totalPage
 }
