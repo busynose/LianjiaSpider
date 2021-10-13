@@ -1,4 +1,4 @@
-module xietong.me/LianjiaSpider
+module lianjiaSpider
 
 go 1.13
 

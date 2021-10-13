@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"lianjiaSpider/common"
+	"lianjiaSpider/model"
+	"lianjiaSpider/pkg"
+
 	"github.com/elastic/go-elasticsearch/esapi"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gocolly/colly"
-	"xietong.me/LianjiaSpider/common"
-	"xietong.me/LianjiaSpider/model"
-	"xietong.me/LianjiaSpider/pkg"
 )
 
 func GetSellingInfoSpider(esClient *elasticsearch.Client, districtName string, page int, filter string) {

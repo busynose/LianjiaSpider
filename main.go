@@ -5,9 +5,10 @@ import (
 	"os"
 	"time"
 
+	"lianjiaSpider/common"
+	"lianjiaSpider/spider"
+
 	"github.com/spf13/viper"
-	"xietong.me/LianjiaSpider/common"
-	"xietong.me/LianjiaSpider/spider"
 )
 
 func main() {

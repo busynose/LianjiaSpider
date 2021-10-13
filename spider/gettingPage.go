@@ -6,8 +6,9 @@ import (
 	"log"
 	"time"
 
+	"lianjiaSpider/common"
+
 	"github.com/gocolly/colly"
-	"xietong.me/LianjiaSpider/common"
 )
 
 //定义page结构体用来处理json
